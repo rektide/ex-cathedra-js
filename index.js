@@ -1,14 +1,15 @@
-var internAt= require("./intern-at"),
-  forEachOmni= require("./foreach-omni")
-module.exports= {internAt: exInternAt, forEachOmni: forEachOmni}
+module.exports= {}
 
 // todo: source set from dir.
 var set= [
+	["becomePromise","./becom-promise"],
 	["block","./block"],
 	["internAt","./intern-at"],
+	["fileJs","./file-js"],
 	["forEachGenerator","./foreach-generator"],
 	["forEachOmni","./foreach-omni"],
-	["getOrSet","./get-or-set"],
+	["getOrRun","./get-or-run"],
+	["internAt","./intern-at"],
 	["newInstance","./new-instance"]
 ]
 set.forEach(memoizeRequire)

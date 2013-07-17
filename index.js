@@ -1,8 +1,12 @@
-module.exports= {}
+var exInternAt= require("./intern-at")
+module.exports= {internAt: exInternAt}
 
-// todo: source set from gitsubmodule file.
+// todo: source set from dir.
 var set= [
-	["block","ex-cathedra-block"]
+	["block","./block"]
+	//["internAt","./intern-at"],
+	["getOrSet","./get-or-set"],
+	["newInstance","./new-instance"]
 ]
 set.forEach(memoizeRequire)
 

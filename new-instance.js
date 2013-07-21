@@ -14,8 +14,8 @@ function needsThis(self,constr){
 function invokeThis(constr,args){
 	// via: http://stackoverflow.com/questions/1606797/use-of-apply-with-new-operator-is-this-possible/#1608546
 	function F() {
-	    return constructor.apply(this, args);
+	    return constr.apply(this, args);
 	}
-	F.prototype = constructor.prototype;
+	F.prototype = constr.prototype;
 	return new F();
 }

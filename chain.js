@@ -78,6 +78,16 @@ function filter(){
 ////////////
 // UTILITY:
 
+function get(cur,d){
+	if(arguments.length == 0)
+		return get.call(this,this,0)
+	if(cur.cc)
+		cur= cur.cc
+	var pos= this.pos[d],
+	  el= cur[pos]
+	return (d >= this.pos.length)? el: get.call(this,el,d+1)
+}
+
 function copyCc(cc){
 	if(cc.cc){
 		return copyCc(cc.cc)

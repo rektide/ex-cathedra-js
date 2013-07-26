@@ -37,8 +37,15 @@ Chain.prototype.exec= function(ctx){
 	ctx= ctx||{}
 	ctx.pos= [[0]]
 	ctx.__proto__= this
-	var done= ctx.done= next.bind(ctx,null)()
-	return done
+	ctx.done= Q.defer()
+	var done= next.bind(ctx,null)()
+	return done.then(function(){
+		this.done.resolve(ctx)
+	}.bind(ctx),function(err){
+		this.done.reject(err)
+	}.bind(ctx),function(not){
+		this.done.notify(not)
+	}.bind(ctx))
 }
 
 function next(val){
@@ -46,17 +53,13 @@ function next(val){
 		return this
 	var last= this.pos++,
 	  post= this.cc[last],
-	  future= this.cc[this.pos],
-	  filters
+	  future= this.cc[this.pos]
 	if(post.post){
-		var filters= getOrDefault(this,filters,Array)
-		filters.push(post)
+		getOrDefault(this,filters,Array).push(post)
 	}
 
-	if(!future){ // do filters
-		if(!this.filter)
-			return this
-		return filter.bind(this)()
+	if(!future){ // do filters, or done
+		return this.filters? filter.bind(this)(): this
 	}
 
 	return Q.when(run(future,this), arguments.callee)

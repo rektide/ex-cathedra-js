@@ -52,18 +52,19 @@ Chain.prototype.exec= function(ctx){
 function next(val){
 	if(val)
 		return this
-	var last= this.pos++,
-	  post= this.cc[last],
-	  future= this.cc[this.pos]
-	if(post.filter){
-		getOrDefault(this,filters,Array).push(post)
-	}
 
-	if(!future){ // do filters, or done
+	var curs= fetchPositions(this),
+	  cur= get(this,curs)
+
+	if(!cur){ // done, do filters if avail
 		return this.filters? filter.bind(this)(): this
+	}else if(cur.filter){ // not done, but add filter
+		getOrDefault(this,filters,Array).push(cur.filter)
 	}
 
-	return Q.when(run(future,this), arguments.callee)
+	// advance in advance of the run we're about to do
+	goNext(curs)
+	return Q.when(run(cur,this), arguments.callee)
 }
 
 function filter(){
@@ -88,54 +89,80 @@ function isChain(ctx){
 }
 
 /**
-  Return the topmost Command specified by `pos`.
+  Return the topmost Command specified by `pos` or a cursors.
 */
-function get(){
-	var curs= getPosition(this)
+function get(ctx,curs){
+	curs= curs||getPositions(ctx)
 	return curs[curs.length-1]
 }
 
 /**
-  Look for and return the next concrete Command, updating `pos` along the way
-Update `pos` with the next command
+  Return the second to top Command specified by a `pos` or a cursors.
 */
-function getNext(){
-	var curs= getPosition(this),
-	  i= this.pos.length-1,
-	  done= false
-	while(!done){
-		var top= curs[i],
-		  chain= _cc(top),
-		  next= this.pos[i]
-	}
+function getPrev(ctx,curs){
+	curs= curs||getPositions(ctx)
+	return curs[curs.length-2]
 }
 
 /**
   Return an array of every Command specified by every level of `pos`.
   This will also extend incomplete `pos` which do not specify a concrete Command, until a Command is arrived at (recurses through Chains until a real Command is arrived at).
 */
-
-function getPositions(ctx){
-	var cur
-	  curs= new Array(ctx.pos.length),
-	  i= 0
-	curs[0]= _cc(ctx)[0]
+function fetchPositions(ctx){
+	var curs= new Array(ctx.pos.length+1),
+	  i= 0 // depth
+	curs[0]= ctx
 	while(i< ctx.pos.length){
-		var prev= curs[i], // current becomes previous 
-		  n= ctx.pos[++i], // find new i'th position
-		  prevCc= _cc(prev) // get the chain from prev
-		cur= prevCc[n] // lookup new current cursor
-		curs[i]= cur
+		var prev= curs[i], // fetch previous depth's element
+		  prevCc= _cc(prev), // get the chain from previous
+		  n= ctx.pos[i++], // get position at this depth, go to next depth
+		  cur= prevCc[n] // lookup new current cursor
+		curs[i]= cur // save element at next depth
 	}
-	while(isChain(cur)){
-		var cur= cur[0]
-		curs.push(next)
-		ctx.pos.push(0)
-		cur= _cc(cur)
+	return iterateInside(ctx,curs)
+}
+
+/**
+  Look for and return the next concrete Command, updating `pos` along the way
+*/
+function goNext(ctx,curs){
+	curs= curs||getPositions(ctx)
+	var i= ctx.pos.length-2 // curs.length-1
+	while(true){
+		var prev= curs[i],
+		  prevCc= _cc(prev),
+		  n= ctx.pos[i+1],
+		  next= prevCc[n+1]
+		if(next){ // advance now
+			++ctx.pos[i+1]
+			break
+		}else if(ctx.pos.length>1){ // more depth try
+			ctx.pos.pop()
+			--i
+		}else{ // cannot do, march off the edge
+			++ctx.pos[0]
+			return false
+		}
 	}
+	// we've walked up until until we found a place to advance pos.
+	curs= iterateInside(ctx,curs) // find current topmost curs
 	return curs
 }
 
+/**
+  A `pos` might reference a chain: lookup zero index elements onto sub-chains until a concrete Command is reached
+*/
+function iterateInside(ctx,curs){
+	var cur= curs[curs.length-1]
+	while(isChain(cur)){
+		var next= _cc(cur)[0]
+		if(!next) // egads, we're in an empty chain- very weird, skip it.
+		  return goNext(ctx,curs)
+		curs.push(next)
+		ctx.pos.push(0)
+	}
+	return curs
+}
 
 function copyCc(cc){
 	if(cc.cc){
@@ -171,8 +198,10 @@ function copyPos(pos){
 function run(el,self){
 	if(typeof el == 'function'){
 		return el(self)
+	}else if(typeof el.handler == 'function'){ // extension for crazy
+		return el.handler(self)
 	}else if(el.cc){
-		el.exec(self)
+		return next.call(self)
 	}else{
 		return el
 	}

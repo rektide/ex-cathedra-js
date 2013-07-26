@@ -9,71 +9,78 @@ module.exports.Cc= Chain
 module.exports.Chain= Chain
 module.exports.chain= Chain
 
-module.exports.deepCopy= true
-module.exports.resetOnExecute= false
+// DEBUGGING OPTIONS
+module.exports.debug= function(){}
+module.exports.debug= console.warn.bind(console)
+
+// RUNTIME OPTIONS
+module.exports.deepCopy= true // when copying Chains, do a deep copy
+module.exports.resetOnExecute= false // execute will always begin from the start if set, else `pos` is accepted in.
 
 /**
   Chain of Command pattern
 */
 function Chain(){
-	if(!(this instanceof Chain)){
-		return newInstance(Chain,arguments)
-	})
+	if(newInstance.needsThis(this,Chain)){
+		return newInstance.invokeThis(Chain,arguments)
+	}
 
 	// determine a compute-chain
 	var chain= Array.prototype.splice.call(arguments,0),
 	  first= chain[0]
-	if(args.length == 1 && first instanceof Array){
-		this.cc= args[0]
-	}else if(args.length == 1 && first.cc instanceof Array){
+	if(chain.length == 1 && first instanceof Array){
+		this.cc= chain[0]
+	}else if(chain.length == 1 && first.cc instanceof Array){
 		this.cc= copyCc(first)
 		this.pos= copyPos(first)
 	}else{
 		this.cc= module.exports.deepCopy? copyCc(chain): chain
 	}
-	this.done= Q.defer()
 	return this
 }
+/**
+  Execute a context and return when done.
+*/
 Chain.prototype.exec= function(ctx){
 	ctx= ctx||{}
-	ctx.pos= ctx.pos&&module.exports.resetOnExecute? ctx.pos: [[0]]
+	ctx.pos= ctx.pos&&module.exports.resetOnExecute? ctx.pos: [0]
+	ctx.next= next.bind(ctx)
+	ctx.filter= filter.bind(ctx)
 	ctx.__proto__= this
-	ctx.done= Q.defer()
-	var done= next.bind(ctx,null)()
-	return done.then(function(){
-		this.done.resolve(ctx)
-	}.bind(ctx),function(err){
-		this.done.reject(err)
-	}.bind(ctx),function(not){
-		this.done.notify(not)
+	ctx.done= ctx.next().then(function(val){
+		return this
 	}.bind(ctx))
+	return ctx.done
 }
 
 function next(val){
-	if(val)
+	if(val){
 		return this
+	}
 
 	var curs= fetchPositions(this),
 	  cur= get(this,curs)
 
 	if(!cur){ // done, do filters if avail
-		return this.filters? filter.bind(this)(): this
+		return this.filter()
 	}else if(cur.filter){ // not done, but add filter
 		getOrDefault(this,filters,Array).push(cur.filter)
 	}
 
 	// advance in advance of the run we're about to do
-	goNext(curs)
-	return Q.when(run(cur,this), arguments.callee)
+	goNext(this,curs)
+	var handler= run(cur,this)
+	return Q.when(handler, this.next, this.filter)
 }
 
 function filter(){
 	var filters= this.filters
 	if(!filters || filters.length == 0){
-		return this
+		return
 	}
-	var f= filters.pop()
-	return Q.when(run(f,this), arguments.callee)
+	var f= filters.pop(),
+	  handler= run(f,this)
+	return Q.when(handler, this.filter)
 }
 
 
@@ -81,10 +88,14 @@ function filter(){
 // UTILITY:
 
 function _cc(ctx){
+	if(!ctx)
+		throw "Cannot resolve chain of undefined"
 	return ctx.cc? ctx.cc: ctx
 }
 
 function isChain(ctx){
+	if(!ctx)
+		return false
 	return ctx.cc|| ctx instanceof Array
 }
 
@@ -92,7 +103,7 @@ function isChain(ctx){
   Return the topmost Command specified by `pos` or a cursors.
 */
 function get(ctx,curs){
-	curs= curs||getPositions(ctx)
+	curs= curs||fetchPositions(ctx)
 	return curs[curs.length-1]
 }
 
@@ -100,7 +111,7 @@ function get(ctx,curs){
   Return the second to top Command specified by a `pos` or a cursors.
 */
 function getPrev(ctx,curs){
-	curs= curs||getPositions(ctx)
+	curs= curs||fetchPositions(ctx)
 	return curs[curs.length-2]
 }
 
@@ -126,11 +137,16 @@ function fetchPositions(ctx){
   Look for and return the next concrete Command, updating `pos` along the way
 */
 function goNext(ctx,curs){
-	curs= curs||getPositions(ctx)
-	var i= ctx.pos.length-2 // curs.length-1
+	curs= curs||fetchPositions(ctx)
+	var i= curs.length-2
 	while(true){
-		var prev= curs[i],
-		  prevCc= _cc(prev),
+		var prev= curs[i]
+		if(!prev){
+			throw "No element"
+			//++ctx.pos[0]
+			//return false
+		}
+		var prevCc= _cc(prev),
 		  n= ctx.pos[i+1],
 		  next= prevCc[n+1]
 		if(next){ // advance now
@@ -172,7 +188,7 @@ function copyCc(cc){
 		return cc
 	}
 	var rv= new Array(cc.length)
-	for(var i= 0; i< cc.length){
+	for(var i= 0; i< cc.length; ++i){
 		var el= cc[i]
 		rv[i]= (module.exports.deepCopy && el instanceof Array || el.cc instanceof Array)? copyCc(el): el
 	}
@@ -195,13 +211,14 @@ function copyPos(pos){
 	return rv
 }
 
-function run(el,self){
+function run(el,self){ // rename & reorder: ctx,command
 	if(typeof el == 'function'){
 		return el(self)
 	}else if(typeof el.handler == 'function'){ // extension for crazy
 		return el.handler(self)
 	}else if(el.cc){
-		return next.call(self)
+		module.exports.debug("RUN-CC")
+		return next()
 	}else{
 		return el
 	}

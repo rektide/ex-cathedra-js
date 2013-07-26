@@ -39,16 +39,16 @@ Cc2.exec({net:9}).then(function(ctx){
 	assert.equal(ctx.other,"agg")
 }).done()
 
-/*
 var Cc3= Chain([cat,cat,Cc1,Cc1,cat])
 Cc3.exec({net:1}).then(function(ctx){
-	assert.equal(ctx.net,111)
+	assert.equal(ctx.net,177)
+	assert.equal(ctx.cat,110)
 	assert.equal(ctx.other,"cat")
 }).done()
 
 var Cc4= Chain([Cc3])
 Cc4.exec({net:3}).then(function(ctx){
-	assert.equal(ctx.net,113)
+	assert.equal(ctx.net,179)
+	assert.equal(ctx.cat,110)
 	assert.equal(ctx.other,"cat")
 }).done()
-*/

@@ -10,6 +10,7 @@ module.exports.Chain= Chain
 module.exports.chain= Chain
 
 module.exports.deepCopy= true
+module.exports.resetOnExecute= false
 
 /**
   Chain of Command pattern
@@ -35,7 +36,7 @@ function Chain(){
 }
 Chain.prototype.exec= function(ctx){
 	ctx= ctx||{}
-	ctx.pos= [[0]]
+	ctx.pos= ctx.pos&&module.exports.resetOnExecute? ctx.pos: [[0]]
 	ctx.__proto__= this
 	ctx.done= Q.defer()
 	var done= next.bind(ctx,null)()
@@ -54,7 +55,7 @@ function next(val){
 	var last= this.pos++,
 	  post= this.cc[last],
 	  future= this.cc[this.pos]
-	if(post.post){
+	if(post.filter){
 		getOrDefault(this,filters,Array).push(post)
 	}
 
@@ -78,15 +79,63 @@ function filter(){
 ////////////
 // UTILITY:
 
-function get(cur,d){
-	if(arguments.length == 0)
-		return get.call(this,this,0)
-	if(cur.cc)
-		cur= cur.cc
-	var pos= this.pos[d],
-	  el= cur[pos]
-	return (d >= this.pos.length)? el: get.call(this,el,d+1)
+function _cc(ctx){
+	return ctx.cc? ctx.cc: ctx
 }
+
+function isChain(ctx){
+	return ctx.cc|| ctx instanceof Array
+}
+
+/**
+  Return the topmost Command specified by `pos`.
+*/
+function get(){
+	var curs= getPosition(this)
+	return curs[curs.length-1]
+}
+
+/**
+  Look for and return the next concrete Command, updating `pos` along the way
+Update `pos` with the next command
+*/
+function getNext(){
+	var curs= getPosition(this),
+	  i= this.pos.length-1,
+	  done= false
+	while(!done){
+		var top= curs[i],
+		  chain= _cc(top),
+		  next= this.pos[i]
+	}
+}
+
+/**
+  Return an array of every Command specified by every level of `pos`.
+  This will also extend incomplete `pos` which do not specify a concrete Command, until a Command is arrived at (recurses through Chains until a real Command is arrived at).
+*/
+
+function getPositions(ctx){
+	var cur
+	  curs= new Array(ctx.pos.length),
+	  i= 0
+	curs[0]= _cc(ctx)[0]
+	while(i< ctx.pos.length){
+		var prev= curs[i], // current becomes previous 
+		  n= ctx.pos[++i], // find new i'th position
+		  prevCc= _cc(prev) // get the chain from prev
+		cur= prevCc[n] // lookup new current cursor
+		curs[i]= cur
+	}
+	while(isChain(cur)){
+		var cur= cur[0]
+		curs.push(next)
+		ctx.pos.push(0)
+		cur= _cc(cur)
+	}
+	return curs
+}
+
 
 function copyCc(cc){
 	if(cc.cc){
@@ -114,7 +163,7 @@ function copyPos(pos){
 		if(el instanceof Number)
 			rv[i]= el
 		else
-			rv[i]= copyPos(el)
+			throw "Cannot copy pos, non-number element"
 	}
 	return rv
 }

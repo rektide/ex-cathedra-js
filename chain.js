@@ -88,8 +88,9 @@ function filter(){
 // UTILITY:
 
 function _cc(ctx){
-	if(!ctx)
+	if(!ctx){
 		throw "Cannot resolve chain of undefined"
+	}
 	return ctx.cc? ctx.cc: ctx
 }
 
@@ -120,7 +121,7 @@ function getPrev(ctx,curs){
   This will also extend incomplete `pos` which do not specify a concrete Command, until a Command is arrived at (recurses through Chains until a real Command is arrived at).
 */
 function fetchPositions(ctx){
-	var curs= new Array(ctx.pos.length+1),
+	var curs= new Array(ctx.pos.length), // TODO: +1 i think?, assert below.
 	  i= 0 // depth
 	curs[0]= ctx
 	while(i< ctx.pos.length){
@@ -130,6 +131,7 @@ function fetchPositions(ctx){
 		  cur= prevCc[n] // lookup new current cursor
 		curs[i]= cur // save element at next depth
 	}
+	// assert.equals(ctx.pos.length+1, curs.length)
 	return iterateInside(ctx,curs)
 }
 
@@ -147,10 +149,10 @@ function goNext(ctx,curs){
 			//return false
 		}
 		var prevCc= _cc(prev),
-		  n= ctx.pos[i+1],
+		  n= ctx.pos[i],
 		  next= prevCc[n+1]
 		if(next){ // advance now
-			++ctx.pos[i+1]
+			++ctx.pos[i]
 			break
 		}else if(ctx.pos.length>1){ // more depth try
 			ctx.pos.pop()
@@ -171,10 +173,11 @@ function goNext(ctx,curs){
 function iterateInside(ctx,curs){
 	var cur= curs[curs.length-1]
 	while(isChain(cur)){
-		var next= _cc(cur)[0]
-		if(!next) // egads, we're in an empty chain- very weird, skip it.
+		var cc= _cc(cur)
+		if(cc.length==0) // egads, we're in an empty chain- very weird, skip it.
 		  return goNext(ctx,curs)
-		curs.push(next)
+		cur= cc[0] // become first element and try again
+		curs.push(cur)
 		ctx.pos.push(0)
 	}
 	return curs

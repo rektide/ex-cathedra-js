@@ -26,19 +26,20 @@ Cc1.exec({net:9}).then(function(ctx){
 	assert.equal(ctx.other,"agg")
 }).done()
 
-/*
 var Cc2= Chain([dog,Cc1])
 Cc2.exec().then(function(ctx){
 	assert.equal(ctx.dog,11)
 	assert.equal(ctx.net,33)
 	assert.equal(ctx.other,"agg")
 }).done()
+
 Cc2.exec({net:9}).then(function(ctx){
 	assert.equal(ctx.dog,11)
 	assert.equal(ctx.net,42)
 	assert.equal(ctx.other,"agg")
 }).done()
 
+/*
 var Cc3= Chain([cat,cat,Cc1,Cc1,cat])
 Cc3.exec({net:1}).then(function(ctx){
 	assert.equal(ctx.net,111)

@@ -36,8 +36,9 @@ function Chain(){
 Chain.prototype.exec= function(ctx){
 	ctx= ctx||{}
 	ctx.pos= [[0]]
-	ctx.prototype= this
-	return next(ctx)	
+	ctx.__proto__= this
+	var done= ctx.done= next.bind(ctx,null)()
+	return done
 }
 
 function next(val){
@@ -45,20 +46,20 @@ function next(val){
 		return this
 	var last= this.pos++,
 	  post= this.cc[last],
-	  next= this.cc[this.pos],
+	  future= this.cc[this.pos],
 	  filters
 	if(post.post){
 		var filters= getOrDefault(this,filters,Array)
 		filters.push(post)
 	}
 
-	if(!next){ // do filters
+	if(!future){ // do filters
 		if(!this.filter)
 			return this
 		return filter.bind(this)()
 	}
 
-	return Q.when(typeof next == 'function'? next(ctx): next,arguments.callee)
+	return Q.when(run(future,this), arguments.callee)
 }
 
 function filter(){
@@ -67,9 +68,8 @@ function filter(){
 		return this
 	}
 	var f= filters.pop()
-	return Q.when(typeof f == 'function'? f(this): f, arguments.callee)
+	return Q.when(run(f,this), arguments.callee)
 }
-
 
 
 ////////////

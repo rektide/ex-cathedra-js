@@ -21,5 +21,5 @@ function memoizeRequire(arr){
 	}catch(ex){
 	}
 	for(var i= 0; i< arr.length-1; ++i)
-		module.exports.arr[i]= req
+		module.exports[arr[i]]= req
 }
